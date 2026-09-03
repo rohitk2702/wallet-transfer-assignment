@@ -62,7 +62,12 @@ CREATE TABLE idempotency_records (
   response_status      INT,
   response_body        JSON,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (
+    (status = 'IN_PROGRESS' AND response_status IS NULL AND response_body IS NULL)
+    OR
+    (status = 'COMPLETED' AND response_status IS NOT NULL AND response_body IS NOT NULL)
+  )
 );
 ```
 
