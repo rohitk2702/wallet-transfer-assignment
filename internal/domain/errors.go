@@ -3,14 +3,6 @@ package domain
 import "errors"
 
 var (
-	// ErrWalletNotFound is returned when a transfer references a wallet
-	// that does not exist.
-	ErrWalletNotFound = errors.New("wallet not found")
-
-	// ErrInsufficientFunds is returned when the source wallet does not
-	// have enough balance to cover the transfer.
-	ErrInsufficientFunds = errors.New("insufficient funds")
-
 	// ErrIdempotencyConflict is returned when an idempotency key is reused
 	// with a request payload that differs from the original.
 	ErrIdempotencyConflict = errors.New("idempotency key reused with a different request payload")

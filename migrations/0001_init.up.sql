@@ -1,5 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 CREATE TABLE wallets (
   id          TEXT PRIMARY KEY,
   balance     BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0),

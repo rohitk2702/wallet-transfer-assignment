@@ -28,7 +28,7 @@ CREATE TABLE wallets (
 CREATE TYPE transfer_status AS ENUM ('PENDING', 'PROCESSED', 'FAILED');
 
 CREATE TABLE transfers (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id              UUID PRIMARY KEY,
   from_wallet_id  TEXT NOT NULL REFERENCES wallets(id),
   to_wallet_id    TEXT NOT NULL REFERENCES wallets(id),
   amount          BIGINT NOT NULL CHECK (amount > 0),
@@ -60,7 +60,7 @@ CREATE TABLE idempotency_records (
   status               idempotency_status NOT NULL DEFAULT 'IN_PROGRESS',
   transfer_id          UUID REFERENCES transfers(id),
   response_status      INT,
-  response_body        JSONB,
+  response_body        JSON,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -68,6 +68,13 @@ CREATE TABLE idempotency_records (
 
 Amounts are `BIGINT` minor units (paise/cents) — avoids float rounding
 errors, standard practice for money.
+
+`transfers.id` and other UUIDs are generated in application code
+(`google/uuid`), not by the database, so no `pgcrypto`/`gen_random_uuid()`
+dependency is needed in the migration. `response_body` is `JSON`, not
+`JSONB` — `JSON` preserves the exact input bytes, which is what makes a
+replayed response byte-identical to the original rather than merely
+semantically equivalent.
 
 ## API
 
@@ -161,9 +168,19 @@ repository/ WalletRepo, TransferRepo, LedgerRepo, IdempotencyRepo. Plain SQL aga
 domain/     Wallet, Transfer, LedgerEntry, Transfer.CanTransition(to Status), amount validation.
 ```
 
-Errors are typed in `domain` (`ErrInsufficientFunds`, `ErrWalletNotFound`,
-`ErrIdempotencyConflict`) and mapped to HTTP status codes in one place in
-the handler layer.
+Two different things flow out of the service, deliberately kept distinct:
+
+- **Business outcomes** (insufficient funds, unknown wallet) are not Go
+  errors — they're legitimate, completed results of a transfer attempt,
+  so the service returns them as a `Result{StatusCode, Body}` like any
+  successful transfer. This is also what lets them be cached under the
+  idempotency key and replayed byte-for-byte, the same as a `PROCESSED`
+  transfer.
+- **Actual errors** (validation failures, idempotency key reuse with a
+  different payload, the processing-wait timeout, unexpected DB errors)
+  are typed in `domain` (`ErrSameWallet`, `ErrInvalidAmount`,
+  `ErrIdempotencyConflict`, `ErrProcessingTimeout`, ...) and mapped to
+  HTTP status codes in one place in the handler layer.
 
 ## Testing
 

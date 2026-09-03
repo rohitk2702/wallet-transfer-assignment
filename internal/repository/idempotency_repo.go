@@ -86,6 +86,15 @@ func (r *IdempotencyRepo) LockForUpdate(ctx context.Context, tx *sql.Tx, key str
 		}
 		return nil, err
 	}
+
+	// The lock is acquired: reset statement_timeout so it doesn't keep
+	// applying to the rest of this transaction (ledger inserts, wallet
+	// updates), which could otherwise get canceled under load for an
+	// unrelated reason.
+	if _, err := tx.ExecContext(ctx, "SET LOCAL statement_timeout = DEFAULT"); err != nil {
+		return nil, err
+	}
+
 	rec.ResponseBody = responseBody
 	return &rec, nil
 }
